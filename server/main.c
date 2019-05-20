@@ -10,7 +10,7 @@ int main(int argc, char* argv[]) {
     pthread_t p,p2;
     Server * server = newServer();
     CMD * cmd = newCMD();
-    initServer(server, 30);
+    initServer(server,30);
     initCMD(cmd,server);
     printf("Attempting to create server thread from %d\n",getpid());
     int rc1 = pthread_create(&p,NULL,&startServer,(void*)server);
