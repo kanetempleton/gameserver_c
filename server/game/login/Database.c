@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-//this is extremely forced at the moment
 int loginCheck(char* user, char* pass) {
     char * filePath = malloc(sizeof(char)*strlen(user)+sizeof(char)*strlen("data/login/.txt"));
     strcpy(filePath,"data/login/");

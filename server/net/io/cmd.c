@@ -41,7 +41,7 @@ void processCommand(CMD * me, char buf[]) {
         t++;
     }
     if (msgToC)
-        messageToClient(me->linked,4,buf);
+        messageToClient(4,buf);
     msgToC=0;
 }
 

@@ -7,10 +7,17 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <sys/time.h> //FD_SET, FD_ISSET, FD_ZERO macros
 #include <sys/mman.h>
 #include "server.h"
 #include "communication/ReplyHandler.h"
+#include "../game/game.h"
+#include "communication/Codes.h"
+
+
+char* sendText;
+int sendTextTo;
 
 
 Server * newServer() {
@@ -21,16 +28,26 @@ Server * newServer() {
 
 void initServer(Server * me, int maxclients) {
     me->randomData = malloc(sizeof(int));
+    me->userData = malloc(sizeof(EntryTable));
+    me->userData->currentSlot = malloc(sizeof(int));
+    *(me->userData->currentSlot) = 0;
+    me->game = newGame();
+    initGame(me->game);
+    sendText = malloc(sizeof(char)*1024);
 }
 
 void deleteServer(Server * me) {
-    free(me);
+    free(me->randomData);
 }
 
 
-void messageToClient(Server * me, int id, char * m) { //needs some force applied over a distance (work)
-    /*printf("messageToClient called\n");
-    me->nextSendMsg=malloc(sizeof(char)*strlen(m)); //free this when it sends
+void messageToClient(int id, char * m) { //needs some force applied over a distance (work)
+    printf("messageToClient called\n");
+    sendTextTo = id;
+    //sendText = m;
+    strcpy(sendText,m);
+
+    /*me->nextSendMsg=malloc(sizeof(char)*strlen(m)); //free this when it sends
     for (int i=0; i<strlen(m); i++) {
         *(me->nextSendMsg+i)=*(m+i);
     }
@@ -39,9 +56,22 @@ void messageToClient(Server * me, int id, char * m) { //needs some force applied
 }
 
 void resetSendBuffer(Server * me) {
-    printf("resetting send buffer...\n");
-    //*(me->nextSendTo)=-1;
-    //free(me->nextSendMsg);
+    /*printf("resetting send buffer...\n");
+    *(me->nextSendTo)=-1;
+    free(me->nextSendMsg);*/
+}
+
+char * getUsername(Server* s, int fd) {
+    return "titties";
+}
+
+void addUsername(Server* me, int from, char* user) {
+    Entry* e = (Entry*)malloc(sizeof(Entry));
+    e->name = user;
+    e->id = malloc(sizeof(int));
+    *(e->id) = from;
+    me->userData->entries[*(me->userData->currentSlot)] = e;
+    *(me->userData->currentSlot) = *(me->userData->currentSlot)+1;
 }
 
 
@@ -52,11 +82,19 @@ void * startServer(void * arg) {
     int opt = 1;
     int master_socket,addrlen,new_socket,activity,valread,sd,max_sd,client_socket[30];
     int max_clients = 30;
+    int connectedClients = 0;
     char buffer[1025];
     char sendbuffer[1025];
     fd_set readfds; //set of socket descriptors
     char *message = "free stuff pl0x\n";
 
+    //create game thread
+    //Game * game = newGame();
+    //initGame(game);
+    pthread_t gameThread;
+    int rc = pthread_create(&gameThread,NULL,&runGame,(void*)me->game);
+    //void * rval;
+    //rc = pthread_join(gameThread, &rval);
     int i;
     for (i=0; i< max_clients; i++) {
         client_socket[i]=0; //unchecked
@@ -147,14 +185,26 @@ void * startServer(void * arg) {
                         printf("valread:%d\n",valread);
                         buffer[valread] = '\0';
                         printf("<newmsg>%s</newmsg>\n",buffer);
-                        send(sd,"testing response",strlen("testing response"),0); //send something else
-                        char* repl = getReply(buffer);
+                        //send(sd,"testing response",strlen("testing response"),0); //send something else
+                        char* repl = getReply(me,sd,buffer);
                         if (strlen(repl)>0) {
+                            printf("sending to %d\n",sd);
                             send(sd,repl,strlen(repl),0);
                         }
                         //replyToSender()
                     }
                 }
+            }
+            if (sendTextTo>=0) {
+                strcpy(sendbuffer,sendText);
+                send(sendTextTo,sendbuffer,strlen(sendbuffer),0);
+                //send(sendTextTo,sendbuffer,strlen(sendbuffer),0);
+                //printf("sent %s\n",sendText);
+                //handleReply(c->replyHandler,recvbuf);
+                //clearBuffer(recvbuf);
+                //sendText = "";
+                memset(sendbuffer,0,sizeof(sendbuffer));
+                sendTextTo=-1;
             }
             /*for (i=0; i<(*(me->max_clients)); i++) {
                 *(me->sd) = client_socket[i];

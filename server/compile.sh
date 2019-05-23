@@ -14,8 +14,13 @@ cd game
 cd login
 gcc -c *.c
 cd ..
+cd entity
+cd player
+gcc -c *.c
+cd .. 
+cd ..
 gcc -c *.c
 cd ..
 
 gcc -c *.c
-gcc -pthread -o main *.c net/*.c net/io/*.c net/communication/*.c game/*.c game/login/*.c
+gcc -pthread -o main *.c net/*.c net/io/*.c net/communication/*.c game/*.c game/login/*.c game/entity/player/*.c
