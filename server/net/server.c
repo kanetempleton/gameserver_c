@@ -16,8 +16,12 @@
 #include "communication/Codes.h"
 
 
-char* sendText;
+char* sendText; //i feel like i shouldn't declare these here
 int sendTextTo;
+int broadcastTextFlag;
+char* broadcastText;
+int dontBroadcastTo;
+int kick;
 
 
 Server * newServer() {
@@ -27,51 +31,40 @@ Server * newServer() {
 
 
 void initServer(Server * me, int maxclients) {
-    me->randomData = malloc(sizeof(int));
-    me->userData = malloc(sizeof(EntryTable));
-    me->userData->currentSlot = malloc(sizeof(int));
-    *(me->userData->currentSlot) = 0;
     me->game = newGame();
     initGame(me->game);
     sendText = malloc(sizeof(char)*1024);
+    broadcastText = malloc(sizeof(char)*1024);
+    kick=-1;
+    broadcastTextFlag = 0;
+    dontBroadcastTo = -1;
 }
 
+
 void deleteServer(Server * me) {
-    free(me->randomData);
+    deleteGame(me->game);
 }
 
 
 void messageToClient(int id, char * m) { //needs some force applied over a distance (work)
-    printf("messageToClient called\n");
     sendTextTo = id;
     //sendText = m;
-    strcpy(sendText,m);
-
-    /*me->nextSendMsg=malloc(sizeof(char)*strlen(m)); //free this when it sends
-    for (int i=0; i<strlen(m); i++) {
-        *(me->nextSendMsg+i)=*(m+i);
-    }
-    *(me->nextSendTo)=id;
-    printf("exiting messagetoclient with nextSendMsg=%s\n",me->nextSendMsg);*/
+    //strcpy(sendText,m);
+    send(sendTextTo,m,strlen(m),0);
+    send(sendTextTo,PADDED_HALT,strlen(PADDED_HALT),0);
+    printf("sent <%s>\n",m);
 }
 
-void resetSendBuffer(Server * me) {
-    /*printf("resetting send buffer...\n");
-    *(me->nextSendTo)=-1;
-    free(me->nextSendMsg);*/
-}
 
 char * getUsername(Server* s, int fd) {
-    return "titties";
+    return ""; //unfinished
 }
 
-void addUsername(Server* me, int from, char* user) {
-    Entry* e = (Entry*)malloc(sizeof(Entry));
-    e->name = user;
-    e->id = malloc(sizeof(int));
-    *(e->id) = from;
-    me->userData->entries[*(me->userData->currentSlot)] = e;
-    *(me->userData->currentSlot) = *(me->userData->currentSlot)+1;
+void messageToAll(char* m, int ds) {
+    strcpy(broadcastText,m);
+    broadcastTextFlag = 1;
+    if (ds!=-1)
+        dontBroadcastTo=ds;
 }
 
 
@@ -86,15 +79,10 @@ void * startServer(void * arg) {
     char buffer[1025];
     char sendbuffer[1025];
     fd_set readfds; //set of socket descriptors
-    char *message = "free stuff pl0x\n";
 
-    //create game thread
-    //Game * game = newGame();
-    //initGame(game);
-    pthread_t gameThread;
+    pthread_t gameThread; //create game thread
     int rc = pthread_create(&gameThread,NULL,&runGame,(void*)me->game);
-    //void * rval;
-    //rc = pthread_join(gameThread, &rval);
+
     int i;
     for (i=0; i< max_clients; i++) {
         client_socket[i]=0; //unchecked
@@ -146,6 +134,7 @@ void * startServer(void * arg) {
             if ((activity<0) && (errno!=EINTR)) {
                 printf("select error\n");
             }
+
         }
 
         if (FD_ISSET(master_socket,&readfds)) { //incoming connection
@@ -154,10 +143,6 @@ void * startServer(void * arg) {
                 exit(EXIT_FAILURE);
             }
             printf("New connection , socket fd is %d , ip is : %s , port : %d  \n" , new_socket , inet_ntoa(address.sin_addr) , ntohs (address.sin_port));
-            if (send(new_socket,message,strlen(message),0)!=strlen(message)) {
-                perror("send");
-            }
-            puts("Sent message");
 
             for (i=0; i<max_clients; i++) {
                 if (client_socket[i]==0) { //position empty
@@ -168,89 +153,71 @@ void * startServer(void * arg) {
             }
         }
 
+        for (int i=0; i<max_clients; i++) {
+            sd = client_socket[i];
+            if (FD_ISSET(sd,&readfds)) {
+                puts("got something");
+                if ((valread = recv(sd,buffer,sizeof(buffer),0))==0) { //disconnection
+                    getpeername(sd,(struct sockaddr*)&address, \
+                                (socklen_t*)&addrlen); //TODO: lookup peername and the slash operator
+                    printf("Host disconnected , ip %s , port %d \n" , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));   //TODO: ntohs
+                    Player* ppp = getPlayer_fd(me->game,sd);
+                    if (ppp!=NULL) {
+                        printf("player was %s with id %d\n",ppp->playerName,*ppp->playerId);
+                        removePlayer(me->game,*ppp->playerId);
+                    }
+                    close(sd);
+                    client_socket[i]=0;
 
-            for (int i=0; i<max_clients; i++) {
-                sd = client_socket[i];
-                if (FD_ISSET(sd,&readfds)) {
-                    puts("got something");
-                    if ((valread = recv(sd,buffer,sizeof(buffer),0))==0) {
-                        getpeername(sd,(struct sockaddr*)&address, \
-                                    (socklen_t*)&addrlen); //TODO: lookup peername and the slash operator
-                        printf("Host disconnected , ip %s , port %d \n" , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));   //TODO: ntohs
+                }
+                else { //received a new message
+
+                    buffer[valread] = '\0';
+                    printf("<newmsg>%s</newmsg>\n",buffer);
+
+                    char* repl = getReply(me,sd,buffer); //send a reply
+                    if (strcmp(repl,"BAD")==0) {
+                        printf("removing client\n");
                         close(sd);
                         client_socket[i]=0;
-
                     }
-                    else { //send message
-                        printf("valread:%d\n",valread);
-                        buffer[valread] = '\0';
-                        printf("<newmsg>%s</newmsg>\n",buffer);
-                        //send(sd,"testing response",strlen("testing response"),0); //send something else
-                        char* repl = getReply(me,sd,buffer);
-                        if (strlen(repl)>0) {
-                            printf("sending to %d\n",sd);
-                            send(sd,repl,strlen(repl),0);
-                        }
-                        //replyToSender()
+                    if (strlen(repl)>0) {
+                        printf("sending to %d\n",sd);
+                        send(sd,repl,strlen(repl),0);
                     }
+                    //replyToSender()
                 }
             }
-            if (sendTextTo>=0) {
-                strcpy(sendbuffer,sendText);
-                send(sendTextTo,sendbuffer,strlen(sendbuffer),0);
-                //send(sendTextTo,sendbuffer,strlen(sendbuffer),0);
-                //printf("sent %s\n",sendText);
-                //handleReply(c->replyHandler,recvbuf);
-                //clearBuffer(recvbuf);
-                //sendText = "";
+        }
+        /*if (broadcastTextFlag==1) {
+            printf("broadcasting; dontsend to %d\n",dontBroadcastTo);
+            for (int i=0; i<*(me->game->nextPlayerId); i++) {
+                strcpy(sendbuffer,broadcastText);
+                printf("getting the fd \n");
+                Player* p = getPlayer(me->game,i);
+                if (p==NULL)
+                    continue;
+                int fd = *(p->playerFd);
+                printf("doing a check\n");
+                if (fd!=dontBroadcastTo || dontBroadcastTo==-1) {
+                    printf("going to %d \n",fd);
+                    send(fd,sendbuffer,strlen(sendbuffer),0);
+                }
+                printf("bout2memset \n");
                 memset(sendbuffer,0,sizeof(sendbuffer));
-                sendTextTo=-1;
             }
-            /*for (i=0; i<(*(me->max_clients)); i++) {
-                *(me->sd) = client_socket[i];
-                int yellsendto=-1;
-                if (*(me->nextSendTo) != yellsendto) {
-                    printf("nextSendTo: %d\n",*(me->nextSendTo));
-                    yellsendto=*(me->nextSendTo);
-                }
-                if (( (*(me->nextSendTo))==client_socket[i]) && client_socket[i]!=0) {
-                    printf("flagged true\n");
-                    int sendcode=0;
-                    sendcode = send(client_socket[i],me->nextSendMsg,strlen(me->nextSendMsg),0);
-                    if (sendcode !=strlen(me->nextSendMsg)) {
-                        perror("sendbuf");
-                    } else {
-                        printf("is working fuck nobody\n");
-                        printf("send returned %d and nextsendmsg was length %lu\n",sendcode,strlen(me->nextSendMsg));
-                        printf("and you tried to send %s to %d\n",me->nextSendMsg,*me->nextSendTo);
-                    }
-                    printf("resetting...");
-                    resetSendBuffer(me);//free shit
-                }
-                if (FD_ISSET(*(me->sd),&(*(me->readfds)))) { //incoming messages
-                    puts("got something");
-                    if ((*(me->valread) = recv(*(me->sd),buffer,1024,0))==0) { //person disconnecting
-                        getpeername(*(me->sd),(struct sockaddr*)&(*(me->address)), \
-                                    (socklen_t*)&(*(me->addrlen))); //TODO: lookup peername and the slash operator
-                        printf("Host disconnected , ip %s , port %d \n" , inet_ntoa((*(me->address)).sin_addr) , ntohs((*(me->address)).sin_port));   //TODO: ntohs
-                        close(*(me->sd));
-                        client_socket[i]=0;
-                    }
-                    else { //received new message
-                        //buffer[*(me->valread)] = '\0';
-                        printf("<newmsg>%s</newmsg>\n",buffer);
-                        //printf("reply:%s\n",getReply(buffer));
-                        char* repl = getReply(buffer);
-                        if (strlen(repl)>0)
-                            send(*(me->sd),repl,strlen(repl),0); //reply to sender
-                        // (*buffer='\0';
+            printf("done resetting flags \n");
+            broadcastTextFlag=0;
+            dontBroadcastTo = -1;
+        }*/
+        /*if (sendTextTo>=0) { //general text sending using global fields
+            strcpy(sendbuffer,sendText);
+            send(sendTextTo,sendbuffer,strlen(sendbuffer),0);
+            memset(sendbuffer,0,sizeof(sendbuffer));
+            sendTextTo=-1;
+        }*/
 
 
-                    }
-                    //buffer="";
-
-                }
-            }*/
     }
     return NULL;
 }

@@ -2,15 +2,27 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "../net/communication/ReplyHandler.h"
+#include "../net/communication/SendMessage.h"
+#include "../util/MutableList.h"
+#include "map/MapData.h"
+#include <unistd.h>
+#include <pthread.h>
+
+pthread_mutex_t gameLock;
 
 Game* newGame() {
     return (Game*)malloc(sizeof(Game));
 }
 void initGame(Game* g) {
+    getTileAt(241,246);
+    getTileAt(241,245);
+    pthread_mutex_init(&gameLock,NULL);
     g->numPlayers = malloc(sizeof(int));
     g->nextPlayerId = malloc(sizeof(int));
     *(g->numPlayers) = 0;
     *(g->nextPlayerId) = 0;
+    g->playersByMapSection = newHashMap();
+    initHashMap(g->playersByMapSection);
 }
 void deleteGame(Game* g) {
     free(g->numPlayers);
@@ -26,13 +38,25 @@ void addPlayer(Game* g, char* name, int fd) { //todo make this reject if max pla
     *(g->nextPlayerId)=*(g->nextPlayerId)+1;
     //loadPlayerInfo(p);
 }
+void addPlayerToGame(Game* g, Player* p) {
+    g->players[*(p->playerId)]=p;
+    *(g->players[*(p->playerId)]->loggedIn) = 1;
+    *(g->numPlayers)=*(g->numPlayers)+1;
+    printf("added player %s to the game. there are now %d players online.\n",p->playerName,*(g->numPlayers));
+    //addPlayerToMapTable(g,p);
+    //fetchPlayersInMapSection(g,p);
+}
 void removePlayer(Game* g, int plrid) {
+    pthread_mutex_lock(&gameLock);
     char* nom = g->players[plrid]->playerName;
+    *(g->players[plrid]->loggedIn)=0;
+    removePlayerFromMapTable(g,g->players[plrid]);
     deletePlayer(g->players[plrid]);
     g->players[plrid]=NULL;
     *(g->numPlayers)=*(g->numPlayers)-1;
     printf("removing player %s with id %d from game\n",nom,plrid);
     printf("there are now %d players online\n",*(g->numPlayers));
+    pthread_mutex_unlock(&gameLock);
 }
 
 Player * getPlayer_fd(Game* g,int fd) {
@@ -55,10 +79,143 @@ Player * getPlayer_id(Game* g, int id) {
     }
     return NULL;
 }
+
+Player* getPlayer(Game* g, int plrid) {
+    return g->players[plrid];
+}
+
+//get the next player ID and update it
+int fetchID(Game* g) {
+    int rv = *(g->nextPlayerId);
+    *(g->nextPlayerId)=*(g->nextPlayerId)+1;
+    return rv;
+}
+void logoutPlayer(Game* g, Player* p) {
+    //char* nom = g->players[plrid]->playerName;
+    pthread_mutex_lock(&gameLock);
+    printf("logging out %s\n",p->playerName);
+    removePlayerFromMapTable(g,p);
+    int id = *(p->playerId);
+    deletePlayer(p);
+    g->players[id]=NULL;
+    *(g->numPlayers)=*(g->numPlayers)-1;
+    printf("there are now %d players online\n",*(g->numPlayers));
+    pthread_mutex_unlock(&gameLock);
+}
+
+int computeMapDataSection(int x, int y) {
+    int mapSectionX = x/MAP_WIDTH;
+    int mapSectionY = y/MAP_HEIGHT;
+    int offsetSectionX = mapSectionX + 714; //(MAX_COORDINATE/MAP_WIDTH);
+    int offsetSectionY = mapSectionY + 833; //(MAX_COORDINATE/MAP_HEIGHT);
+    int sumPartX =  offsetSectionX * 10000;
+    int sumPartY = offsetSectionY + 100000000;
+    return sumPartX+sumPartY;
+}
+
+void addPlayerToMapTable(Game* g, Player* p) {
+    //hashMap_add_enableDuplicates(g->playersByMapSection,computeMapDataSection(*(p->absX),*(p->absY)),*(p->playerId));
+    //printMap(g->playersByMapSection);
+    int curSec = computeMapDataSection(*(p->absX),*(p->absY));
+    if (*(p->inMap)!=curSec) {
+        if (*(p->inMap)>=0) {
+            hashMap_removeSpecific(g->playersByMapSection,*(p->inMap),*(p->playerId));
+        }
+        hashMap_add_enableDuplicates(g->playersByMapSection,curSec,*(p->playerId));
+        *(p->inMap)=curSec;
+    }
+}
+
+void removePlayerFromMapTable(Game* g, Player* p) {
+    printf("removing %s from map table...\n",p->playerName);
+    removePlayerFromMapSection(g,p,computeMapDataSection(*(p->absX),*(p->absY)),1);
+    hashMap_removeSpecific(g->playersByMapSection,computeMapDataSection(*(p->absX),*(p->absY)),*(p->playerId));
+    *(p->inMap)=-1;
+}
+
+void broadcastExistenceInMapSection(Game* g, Player* p, int fromX, int fromY) {
+    printf("trying to broadcast\n");
+    int sec =  computeMapDataSection(*(p->absX),*(p->absY));
+
+    MutableList* playersInSection = newMutableList();
+    initMutableList(playersInSection);
+    int plid = hashMap_remove(g->playersByMapSection,sec);
+    mutList_addValue(playersInSection,plid);
+    while (plid!=-1) {
+        printf("plidto:%d\n",plid);
+        //mutList_addValue(playersInSection,plid);
+        sendPlayerPresenceTo(p,getPlayer(g,plid),fromX,fromY);
+        plid = hashMap_remove(g->playersByMapSection,sec);
+        mutList_addValue(playersInSection,plid);
+    }
+    while (!mutList_atEnd(playersInSection))
+        hashMap_add_enableDuplicates(g->playersByMapSection,sec,mutList_next(playersInSection));
+
+    deleteMutableList(playersInSection);
+    free(playersInSection);
+}
+
+void fetchPlayersInMapSection(Game* g, Player* p) {
+    int sec = computeMapDataSection(*(p->absX),*(p->absY));
+    MutableList* playersInSection = newMutableList();
+    initMutableList(playersInSection);
+    int plid = hashMap_remove(g->playersByMapSection,sec);
+    while (plid!=-1) {
+        printf("player in map section: %s\n",getPlayer(g,plid)->playerName);
+        mutList_addValue(playersInSection,plid);
+        if (plid!=*(p->playerId)) {
+            sendPlayerPresenceTo(getPlayer(g,plid),p,*(getPlayer(g,plid)->lastX),*(getPlayer(g,plid)->lastY));
+            sendPlayerPresenceTo(p,getPlayer(g,plid),*(p->lastX),*(p->lastY));
+        }
+        plid = hashMap_remove(g->playersByMapSection,sec);
+    }
+    while (!mutList_atEnd(playersInSection)) {
+        hashMap_add_enableDuplicates(g->playersByMapSection,sec,mutList_next(playersInSection));
+    }
+
+    deleteMutableList(playersInSection);
+    free(playersInSection);
+}
+
+void removePlayerFromMapSection(Game* g, Player* p, int oldSec, int sendCurPos) {
+    printf("trying to remove %s from section %d\n",p->playerName,oldSec);
+    MutableList* playersInSection = newMutableList();
+    initMutableList(playersInSection);
+    int plid = hashMap_remove(g->playersByMapSection,oldSec);
+    while (plid!=-1) {
+        //printf("player in map section: %s\n",getPlayer(g,plid)->playerName);
+        mutList_addValue(playersInSection,plid);
+        if (plid!=*(p->playerId)) {
+            //sendPlayerPresenceTo(getPlayer(g,plid),p,*(getPlayer(g,plid)->lastX),*(getPlayer(g,plid)->lastY));
+            //sendPlayerPresenceTo(p,getPlayer(g,plid),*(p->lastX),*(p->lastY));
+            if (sendCurPos)
+                sendPlayerExitTo(getPlayer(g,plid),*(p->playerId),*(p->absX),*(p->absY));
+            else
+                sendPlayerExitTo(getPlayer(g,plid),*(p->playerId),*(p->lastX),*(p->lastY));
+        }
+        plid = hashMap_remove(g->playersByMapSection,oldSec);
+    }
+    while (!mutList_atEnd(playersInSection)) {
+        hashMap_add_enableDuplicates(g->playersByMapSection,oldSec,mutList_next(playersInSection));
+    }
+
+    deleteMutableList(playersInSection);
+    free(playersInSection);
+}
+
 void * runGame(void * arg) {
-    Game* me = (Game*)arg;
+    Game* g = (Game*)arg;
     while (1) { //game loop
-        //do nothing
-        //printf("game loop\n");
+        pthread_mutex_lock(&gameLock);
+        for (int i=0; i<*(g->nextPlayerId); i++) { //process players.. good or bad?
+            if (g->players[i]!=NULL) {
+                if (*(g->players[i]->inMap)!=computeMapDataSection(*(g->players[i]->absX),*(g->players[i]->absY))) {
+                    if (*(g->players[i]->loggedIn))
+                        addPlayerToMapTable(g,g->players[i]);
+                    //fetchPlayersInMapSection(g,g->players[i]);
+                }
+            }
+        }
+        pthread_mutex_unlock(&gameLock);
     }
 }

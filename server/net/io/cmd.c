@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "../server.h"
+#include "../../util/HashMap.h"
 
 CMD * newCMD() {
     return (CMD*)malloc(sizeof(CMD));
@@ -24,17 +25,21 @@ void processCommand(CMD * me, char buf[]) {
     while( token != NULL ) {
         //while (strcmp(check,input) != 0)
         if (t==0) {
-            if (strcmp("talk",token) == 0)
-                msgToC = 1;
-            else
-                printf("wrong");
-        }
-        if (t>=1) {
-            if (msgToC) {
-                sprintf(buf,"%s",token);
-                //messageToClient(me->linked,4,token);
+            if (strcmp("talk",token) == 0) {
 
             }
+            else if (strcmp("mapplayers",token)==0) {
+                printMap(me->linked->game->playersByMapSection);
+            }
+            else if (strcmp("players",token)==0) {
+                
+            }
+            else {
+                printf("invalid command\n");
+            }
+
+        }
+        if (t>=1) {
 
         }
         token = strtok(NULL, " ");

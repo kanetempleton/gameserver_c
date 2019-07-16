@@ -1,3 +1,8 @@
+/*  Database.c
+    Handles login requests by checking if file exists for a given username
+    and determining if passwords match
+*/
+
 #include "Database.h"
 #include <string.h>
 #include <unistd.h>
@@ -58,6 +63,7 @@ int loginCheck(char* user, char* pass) {
         //}
         fprintf(fp,"\nEOF");
         fclose(fp);
+        free(filePath);
         return LOGIN_NEW;
     }
     free(filePath);

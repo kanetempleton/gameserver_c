@@ -6,73 +6,67 @@
 #include "../../game.h"
 #include "../../../net/server.h"
 #include "../../../net/communication/Codes.h"
+#include "../../../net/communication/SendMessage.h"
 
 Player * newPlayer() {
-    return malloc(sizeof(Player));
+    return (Player*)malloc(sizeof(Player));
 }
 void initPlayer(Player * p, char* name, int fd, int id) {
     p->playerId = malloc(sizeof(int));
     p->playerFd = malloc(sizeof(int));
     p->absX = malloc(sizeof(int));
     p->absY = malloc(sizeof(int));
+    p->lastX = malloc(sizeof(int));
+    p->lastY = malloc(sizeof(int));
+    p->playerName = malloc(sizeof(char)*12);
+    p->inMap = malloc(sizeof(int));
+    p->loggedIn = malloc(sizeof(int));
     *(p->playerId) = id;
     *(p->playerFd) = fd;
     *(p->absX) = -1;
     *(p->absY) = -1;
-    p->playerName = name;
-
+    *(p->lastX) = -1;
+    *(p->lastY) = -1;
+    *(p->loggedIn) = 1;
+    *(p->inMap) = -1;
+    strcpy(p->playerName,name);
+    /*for (int i=0; i<strlen(name); i++) {
+        *(p->playerName+i)=name[i];
+    }*/
 }
 void deletePlayer(Player * p) {
     free(p->playerId);
     free(p->playerFd);
     free(p->absX);
     free(p->absY);
-    //free(p->playerN)
+    free(p->lastX);
+    free(p->lastY);
+    free(p->inMap);
+    free(p->playerName);
 }
 
-void createNewPlayer(Player * p) { //initialize fields to what they should be for new players
+void setPlayerToNew(Player * p) { //initialize fields to what they should be for new players
     *(p->absX)=START_X;
     *(p->absY)=START_Y;
 }
 
 
-void sendPlayerDataToClient(Player * p) {
-    printf("sending data to client\n");
-    char* sendinfotxt = malloc(sizeof(char)*(10+strlen(SEND_PLAYER_DATA)+strlen(SPLIT)*2));
-    char xbuf[4];
-    char ybuf[4];
-    sprintf(xbuf,"%d",*(p->absX));
-    sprintf(ybuf,"%d",*(p->absY));
-    strcpy(sendinfotxt,SEND_PLAYER_DATA);
-    strcat(sendinfotxt,SPLIT);
-    strcat(sendinfotxt,xbuf);
-    strcat(sendinfotxt,SPLIT);
-    strcat(sendinfotxt,ybuf);
-    messageToClient(*(p->playerFd),sendinfotxt);
-    free(sendinfotxt);
-}
-
 void savePlayerInfo(Player * p) {
-    printf("saving data for player %s\n",p->playerName);
+    //printf("saving data for player %s\n",p->playerName);
     char * filePath = malloc(sizeof(char)*(strlen(p->playerName)+strlen("data/player/.txt")+1));
-    printf("malloc'd file path\n");
     strcpy(filePath,"data/player/");
     strcat(filePath,p->playerName);
     strcat(filePath,".txt");
-    printf("did strcat filepath is %s\n",filePath);
     FILE * fp;
     fp = fopen(filePath,"w");
     //save player info
-    printf("opened file path \n");
     fprintf(fp,"%d ",*(p->absX));
     fprintf(fp,"%d \n",*(p->absY));
     //end save player info
     fprintf(fp,"EOF");
-    printf("saved stuff\n");
     fclose(fp);
     free(filePath);
-    printf("closed file path\n");
-    sendPlayerDataToClient(p);
+    //sendPlayerDataToClient(p);
 }
 
 void loadPlayerInfo(Player * p) { //called on login
@@ -119,11 +113,10 @@ void loadPlayerInfo(Player * p) { //called on login
             }
         }
         fclose(fp);
-        sendPlayerDataToClient(p);
     }
     else { //new player
         printf("file not found make it\n");
-        createNewPlayer(p);
+        setPlayerToNew(p);
         savePlayerInfo(p);
     }
     free(filePath);
