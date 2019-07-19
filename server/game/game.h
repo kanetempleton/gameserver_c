@@ -32,4 +32,5 @@ Player * getPlayer(Game* g, int plid); //probably just gonna use this one
 int fetchID(Game* g);
 void logoutPlayer(Game* g, Player* p);
 int computeMapDataSection(int x, int y);
+void saveMapdata(int section, char* data);
 #endif

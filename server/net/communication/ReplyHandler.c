@@ -17,8 +17,10 @@ char* getReply(Server* s, int from, char* rcv) {
     int updatePosReq = 0;
     char* name = malloc(sizeof(char)*MAXIMUM_USERNAME_LENGTH);
     char* pass = malloc(sizeof(char)*MAXIMUM_PASSWORD_LENGTH);
+    char* mapdat = malloc(505);
     int x = -1;
     int y = -1;
+    int mapedit = 0;
     while( token != NULL ) {
         switch (t) {
             case 0: //first word in packet; always client signature
@@ -98,6 +100,9 @@ char* getReply(Server* s, int from, char* rcv) {
                     sendMapToPlayer(getPlayer(s->game,fromId),1,mapStringSend);*/
 
                 }
+                else if (strcmp(token,SEND_MAP_EDIT)==0) {
+                    mapedit=1;
+                }
                 break;
             case 3://start of args
                 if (updatePosReq)
@@ -105,12 +110,20 @@ char* getReply(Server* s, int from, char* rcv) {
                 else if (logReq) {
                     strcpy(name,token);
                 }
+                else if (mapedit) {
+                    mapedit = strtol(token,NULL,10);
+                }
                 break;
             case 4:
                 if (updatePosReq)
                     y = strtol(token,NULL,10);
                 else if (logReq)
                     strcpy(pass,token);
+                else if (mapedit>0) {
+                    strcpy(mapdat,token);
+                    saveMapdata(mapedit,mapdat);
+                    printf("saved map file for %d\n",mapedit);
+                }
                 break;
         }
         token = strtok(NULL, SPLIT); //next token

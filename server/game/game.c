@@ -7,6 +7,7 @@
 #include "map/MapData.h"
 #include <unistd.h>
 #include <pthread.h>
+#include <string.h>
 
 pthread_mutex_t gameLock;
 
@@ -201,6 +202,33 @@ void removePlayerFromMapSection(Game* g, Player* p, int oldSec, int sendCurPos) 
 
     deleteMutableList(playersInSection);
     free(playersInSection);
+}
+
+void saveMapdata(int section, char* data) {
+    //printf("saving data for player %s\n",p->playerName);
+    char * filePath = malloc(sizeof(char)*(10+strlen("data/map/.txt")+1));
+    strcpy(filePath,"data/map/");
+    char stupidbuffer[10];
+    sprintf(stupidbuffer,"%d",section);
+    strcat(filePath,stupidbuffer);
+    strcat(filePath,".txt");
+    FILE * fp;
+    fp = fopen(filePath,"w");
+    //save player info
+    for (int i=0; i<strlen(data); i++) {
+    //    fprintf(fp,"%d",*(data+i));
+        if (i!=0 && i%42==0)
+            fprintf(fp,"\n%c",*(data+i));
+        else if (i%3==0 && i!=0)
+            fprintf(fp," %c",*(data+i));
+        else
+            fprintf(fp,"%c",*(data+i));
+    }
+    //end save player info
+    fclose(fp);
+    free(filePath);
+    printf("done writing map\n");
+    //sendPlayerDataToClient(p);
 }
 
 void * runGame(void * arg) {

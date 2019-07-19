@@ -29,6 +29,7 @@
 #define PLAYER_MOVEMENT_REQUEST "moveme"
 #define PLAYER_LOGOUT_REQUEST "logmeout"
 #define PLAYER_LOGIN_MAP_REQUEST "510"
+#define SEND_MAP_EDIT "512"
 
 //actions - unsorted
 #define SUCCESS_LOGIN "successlogin"
