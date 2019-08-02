@@ -1,8 +1,8 @@
 #ifndef H_GAME
 #define H_GAME
 #define MAX_PLAYERS 30
-#define START_X 250
-#define START_Y 250
+#define START_X 245
+#define START_Y 246
 #define MAP_WIDTH 14
 #define MAP_HEIGHT 12
 #include "entity/player/player.h"
@@ -33,4 +33,5 @@ int fetchID(Game* g);
 void logoutPlayer(Game* g, Player* p);
 int computeMapDataSection(int x, int y);
 void saveMapdata(int section, char* data);
+void actionToPlayersInMapSection(Game* g, int sec, void (*v)(), Player* plrArg, char* txtArg);
 #endif

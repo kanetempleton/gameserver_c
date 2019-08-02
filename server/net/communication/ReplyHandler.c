@@ -21,6 +21,7 @@ char* getReply(Server* s, int from, char* rcv) {
     int x = -1;
     int y = -1;
     int mapedit = 0;
+    int publicChatSend = -1;
     while( token != NULL ) {
         switch (t) {
             case 0: //first word in packet; always client signature
@@ -103,6 +104,9 @@ char* getReply(Server* s, int from, char* rcv) {
                 else if (strcmp(token,SEND_MAP_EDIT)==0) {
                     mapedit=1;
                 }
+                else if (strcmp(token,SEND_PUBLIC_CHAT)==0) {
+                    publicChatSend=1;
+                }
                 break;
             case 3://start of args
                 if (updatePosReq)
@@ -112,6 +116,11 @@ char* getReply(Server* s, int from, char* rcv) {
                 }
                 else if (mapedit) {
                     mapedit = strtol(token,NULL,10);
+                }
+                else if (publicChatSend==1) {
+                    //publicChatSend=strtol(token,NULL,10);
+                    int sec = computeMapDataSection(*(getPlayer(s->game,fromId)->absX),*(getPlayer(s->game,fromId)->absY));
+                    actionToPlayersInMapSection(s->game,sec,sendPublicChatOfPlayerTo,getPlayer(s->game,fromId),token);
                 }
                 break;
             case 4:

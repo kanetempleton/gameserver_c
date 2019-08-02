@@ -14,6 +14,10 @@
 #include "communication/ReplyHandler.h"
 #include "../game/game.h"
 #include "communication/Codes.h"
+#include <pthread.h>
+
+pthread_mutex_t serverLock;
+
 
 
 char* sendText; //i feel like i shouldn't declare these here
@@ -31,6 +35,7 @@ Server * newServer() {
 
 
 void initServer(Server * me, int maxclients) {
+    pthread_mutex_init(&serverLock,NULL);
     me->game = newGame();
     initGame(me->game);
     sendText = malloc(sizeof(char)*1024);
@@ -47,12 +52,14 @@ void deleteServer(Server * me) {
 
 
 void messageToClient(int id, char * m) { //needs some force applied over a distance (work)
+    pthread_mutex_lock(&serverLock);
     sendTextTo = id;
     //sendText = m;
     //strcpy(sendText,m);
     send(sendTextTo,m,strlen(m),0);
-    send(sendTextTo,PADDED_HALT,strlen(PADDED_HALT),0);
+    //send(sendTextTo,PADDED_HALT,strlen(PADDED_HALT),0);
     printf("sent <%s>\n",m);
+    pthread_mutex_unlock(&serverLock);
 }
 
 

@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
     CMD * cmd = newCMD();
     initServer(mainServer,30);
     initCMD(cmd,mainServer);
-    printf("Attempting to create server thread from %d\n",getpid());
+    //printf("Attempting to create server thread from %d\n",getpid());
     /*printf("creating hash table...\n");
     HashMap* map = newHashMap();
     initHashMap(map);

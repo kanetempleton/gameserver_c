@@ -11,4 +11,6 @@ void broadcastPlayerPresence(Player* p, int oldx, int oldy);
 void sendPlayerPresenceTo(Player* pOf, Player* pTo, int oldx, int oldy);
 void sendMapToPlayer(Game* g,Player* p, int mapNum, char* data);
 void sendPlayerExitTo(Player* pTo, int ofID, int fromX, int fromY);
+void sendInfoMessage(Player* p, char* msg);
+void sendPublicChatOfPlayerTo(Player* pOf, Player* pTo, char* msg);
 #endif

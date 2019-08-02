@@ -24,6 +24,7 @@ void initGame(Game* g) {
     *(g->nextPlayerId) = 0;
     g->playersByMapSection = newHashMap();
     initHashMap(g->playersByMapSection);
+    //actionToPlayersInMapSection(g, printNumber);
 }
 void deleteGame(Game* g) {
     free(g->numPlayers);
@@ -176,6 +177,32 @@ void fetchPlayersInMapSection(Game* g, Player* p) {
 
     deleteMutableList(playersInSection);
     free(playersInSection);
+}
+
+void actionToPlayersInMapSection(Game* g, int sec, void (*action)(), Player* plrArg, char* txtArg) {
+    //(*v)(5);
+    MutableList* playersInSection = newMutableList();
+    initMutableList(playersInSection);
+    int plid = hashMap_remove(g->playersByMapSection,sec);
+    while (plid!=-1) {
+        //printf("player in map section: %s\n",getPlayer(g,plid)->playerName);
+        mutList_addValue(playersInSection,plid);
+
+        action(plrArg,getPlayer(g,plid),txtArg);
+        //sendPlayerPresenceTo(getPlayer(g,plid),p,*(getPlayer(g,plid)->lastX),*(getPlayer(g,plid)->lastY));
+        //sendPlayerPresenceTo(p,getPlayer(g,plid),*(p->lastX),*(p->lastY));
+        plid = hashMap_remove(g->playersByMapSection,sec);
+    }
+    while (!mutList_atEnd(playersInSection)) {
+        hashMap_add_enableDuplicates(g->playersByMapSection,sec,mutList_next(playersInSection));
+    }
+
+    deleteMutableList(playersInSection);
+    free(playersInSection);
+}
+
+void printNumber(int x) {
+    printf("number: %d\n",x);
 }
 
 void removePlayerFromMapSection(Game* g, Player* p, int oldSec, int sendCurPos) {

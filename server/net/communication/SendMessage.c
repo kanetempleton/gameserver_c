@@ -129,6 +129,8 @@ void sendMapToPlayer(Game* g, Player* p, int mapNum, char* data) {
     strcat(sendinfotxt,data);
     messageToClient(*(p->playerFd),sendinfotxt);
     free(sendinfotxt);
+
+    //sendInfoMessage(p,"testing testing swag swag swag 69 420 666");
 }
 
 void sendPlayerExitTo(Player* pTo, int idOf, int fromX, int fromY) {
@@ -150,4 +152,26 @@ void sendPlayerExitTo(Player* pTo, int idOf, int fromX, int fromY) {
     printf("TRYING TO SEND THE PLAYER' EXIT %d %d\n",idOf,*(pTo->playerId));
     messageToClient(*(pTo->playerFd),sendinfotxt);
     free(sendinfotxt);
+}
+
+void sendInfoMessage(Player* p, char* msg) {
+    char* sendinfotxt = malloc(sizeof(char)*(1+strlen(msg)+strlen(SEND_INFOBOX_MSG)+strlen(SPLIT)));
+    strcpy(sendinfotxt,SEND_INFOBOX_MSG);
+    strcat(sendinfotxt,SPLIT);
+    strcat(sendinfotxt,msg);
+    //messageToAll(sendinfotxt,*(p->playerFd));
+    //printf("TRYING TO SEND THE PLAYER' EXIT %d %d\n",idOf,*(pTo->playerId));
+    messageToClient(*(p->playerFd),sendinfotxt);
+    free(sendinfotxt);
+}
+
+void sendPublicChatOfPlayerTo(Player* pOf, Player* pTo, char* msg) {
+    char* sendinfo = malloc(1+strlen(pOf->playerName)+strlen(msg)+strlen(PUBLIC_CHAT_FROM)+strlen(SPLIT)*2);
+    strcpy(sendinfo,PUBLIC_CHAT_FROM);
+    strcat(sendinfo,SPLIT);
+    strcat(sendinfo,pOf->playerName);
+    strcat(sendinfo,SPLIT);
+    strcat(sendinfo,msg);
+    messageToClient(*(pTo->playerFd),sendinfo);
+    free(sendinfo);
 }
