@@ -29,10 +29,13 @@ void processCommand(CMD * me, char buf[]) {
 
             }
             else if (strcmp("mapplayers",token)==0) {
-                printMap(me->linked->game->playersByMapSection);
+                printMap(mainGame->playersByMapSection);
             }
-            else if (strcmp("players",token)==0) {
-                
+            else if (strcmp("npcs",token)==0) {
+                for (int i=0; i<*(mainGame->nextNPCId); i++) {
+                    if (mainGame->npcs[i]!=NULL)
+                        printNPC(mainGame->npcs[i]);
+                }
             }
             else {
                 printf("invalid command\n");

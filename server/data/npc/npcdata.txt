@@ -1,0 +1,13 @@
+# TOKENS
+#
+# hp <num> = set hitpoints
+# lvl <num> = set power level
+# mhit <num> = set max hit
+# op <num> = enbale click option (0 = talk to, 1 = attack)
+# n <text> = name NPC (do this last)
+#
+# START OF DATA
+0 hp 100 op 0 n Tour Guide
+1 lvl 3 hp 100 op 1 n Raccoon
+2 lvl 150 hp 10000 op 0 op 1 n Grandmaster Chess Player
+EOF

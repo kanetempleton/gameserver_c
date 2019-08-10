@@ -7,9 +7,9 @@
 
 void registerPlayerWithID(Player * p, Server* s, int fd) {
 
-    *(p->playerId) = fetchID(s->game);
+    *(p->playerId) = fetchID(mainGame);
     *(p->playerFd) = fd;
-    addPlayerToGame(s->game,p);
+    addPlayerToGame(mainGame,p);
     char* sendText = malloc(strlen(SEND_PLAYER_ID)+strlen(SPLIT)+6);
     strcpy(sendText,SEND_PLAYER_ID);
     strcat(sendText,SPLIT);
@@ -174,4 +174,40 @@ void sendPublicChatOfPlayerTo(Player* pOf, Player* pTo, char* msg) {
     strcat(sendinfo,msg);
     messageToClient(*(pTo->playerFd),sendinfo);
     free(sendinfo);
+}
+
+void alertPlayerOfNpc(Player * p, Npc* n) {
+    char* sendinfo = malloc(26+strlen(SHOW_NPC)+strlen(SPLIT)*6+strlen(npcName(n)));
+    strcpy(sendinfo,SHOW_NPC);
+    strcat(sendinfo,SPLIT);
+    char* idbuf = malloc(5);
+    sprintf(idbuf,"%d",*(n->npcID));
+    strcat(sendinfo,idbuf);
+    strcat(sendinfo,SPLIT);
+    char* xbuf = malloc(5);
+    char* ybuf = malloc(5);
+    sprintf(xbuf,"%d",npcX(n));
+    sprintf(ybuf,"%d",npcY(n));
+    strcat(sendinfo,xbuf);
+    strcat(sendinfo,SPLIT);
+    strcat(sendinfo,ybuf);
+    strcat(sendinfo,SPLIT);
+    char* lvlbuf = malloc(10);
+    sprintf(lvlbuf,"%d",*(n->powerLevel));
+    strcat(sendinfo,lvlbuf);
+    strcat(sendinfo,SPLIT);
+    for (int i=0; i<NUM_NPC_CLICK_OPTIONS; i++) {
+        char* optionbuf = malloc(2);
+        sprintf(optionbuf,"%d",*(n->options[i]));
+        strcat(sendinfo,optionbuf);
+        free(optionbuf);
+    }
+    strcat(sendinfo,SPLIT);
+    strcat(sendinfo,npcName(n));
+    messageToClient(*(p->playerFd),sendinfo);
+    free(sendinfo);
+    free(xbuf);
+    free(ybuf);
+    free(idbuf);
+    free(lvlbuf);
 }

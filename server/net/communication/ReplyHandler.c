@@ -50,10 +50,10 @@ char* getReply(Server* s, int from, char* rcv) {
                     }
                 }
                 if (strcmp(token,PLAYER_INFO_REQUEST)==0) {
-                    Player* p = getPlayer(s->game,fromId);
+                    Player* p = getPlayer(mainGame,fromId);
                     loadPlayerInfo(p);
                     //
-                    sendPlayerDataToClient(s->game,p);
+                    sendPlayerDataToClient(mainGame,p);
 
                 }
                 else if (strcmp(token,PLAYER_MOVEMENT_REQUEST)==0) {
@@ -61,44 +61,51 @@ char* getReply(Server* s, int from, char* rcv) {
                 }
                 else if (strcmp(token,PLAYER_LOGOUT_REQUEST)==0) {
                     //logoutPlayer();
-                    sendLogoutSignalToPlayer(getPlayer(s->game,fromId));
-                    logoutPlayer(s->game,getPlayer(s->game,fromId));
+                    sendLogoutSignalToPlayer(getPlayer(mainGame,fromId));
+                    logoutPlayer(mainGame,getPlayer(mainGame,fromId));
                 }
                 else if (strcmp(token,PLAYER_LOGIN_MAP_REQUEST)==0) {
-                    int sec = computeMapDataSection(*(getPlayer(s->game,fromId)->absX),*(getPlayer(s->game,fromId)->absY));
+                    int sec = computeMapDataSection(*(getPlayer(mainGame,fromId)->absX),*(getPlayer(mainGame,fromId)->absY));
                     int ce = ceil(log10(sec));
                     char mapStringSend[MAP_WIDTH*MAP_HEIGHT*3+3];
                     getMapStringForChunk(sec,mapStringSend);
                     //char mapdataBuf[ce+1];
                     //sprintf(mapdataBuf,"%d",sec);
-                    sendMapToPlayer(s->game,getPlayer(s->game,fromId),5,mapStringSend);
-                    fetchPlayersInMapSection(s->game,getPlayer(s->game,fromId));
-                    //addPlayerToMapTable(s->game,getPlayer(s->game,fromId));
-                    //broadcastExistenceInMapSection(s->game,getPlayer(s->game,fromId),*(getPlayer(s->game,fromId)->absX),*(getPlayer(s->game,fromId)->absY));
+                    sendMapToPlayer(mainGame,getPlayer(mainGame,fromId),5,mapStringSend);
+                    fetchPlayersInMapSection(mainGame,getPlayer(mainGame,fromId));
+                    for (int i=0; i<*(mainGame->nextNPCId); i++) { //TODO: change this to hashing
+                        if (mainGame->npcs[i]!=NULL) {
+                            int sec2 = computeMapDataSection(npcX(mainGame->npcs[i]),npcY(mainGame->npcs[i]));
+                            actionToPlayersInMapSection(mainGame, sec2, alertPlayerOfNpc, NULL, mainGame->npcs[i]);
+                        }
+                    }
+                    //actionToPlayersInMapSection(mainGame, sec, alertPlayerOfNpc, NULL, npc);
+                    //addPlayerToMapTable(mainGame,getPlayer(mainGame,fromId));
+                    //broadcastExistenceInMapSection(mainGame,getPlayer(mainGame,fromId),*(getPlayer(mainGame,fromId)->absX),*(getPlayer(mainGame,fromId)->absY));
 
                     /*getMapStringForChunk(sec+10000,mapStringSend);
-                    sendMapToPlayer(getPlayer(s->game,fromId),6,mapStringSend);
+                    sendMapToPlayer(getPlayer(mainGame,fromId),6,mapStringSend);
 
                     getMapStringForChunk(sec-9999,mapStringSend);
-                    sendMapToPlayer(getPlayer(s->game,fromId),7,mapStringSend);
+                    sendMapToPlayer(getPlayer(mainGame,fromId),7,mapStringSend);
 
                     getMapStringForChunk(sec+1,mapStringSend);
-                    sendMapToPlayer(getPlayer(s->game,fromId),8,mapStringSend);
+                    sendMapToPlayer(getPlayer(mainGame,fromId),8,mapStringSend);
 
                     getMapStringForChunk(sec+10001,mapStringSend);
-                    sendMapToPlayer(getPlayer(s->game,fromId),9,mapStringSend);
+                    sendMapToPlayer(getPlayer(mainGame,fromId),9,mapStringSend);
 
                     getMapStringForChunk(sec-10000,mapStringSend);
-                    sendMapToPlayer(getPlayer(s->game,fromId),4,mapStringSend);
+                    sendMapToPlayer(getPlayer(mainGame,fromId),4,mapStringSend);
 
                     getMapStringForChunk(sec+9999,mapStringSend);
-                    sendMapToPlayer(getPlayer(s->game,fromId),3,mapStringSend);
+                    sendMapToPlayer(getPlayer(mainGame,fromId),3,mapStringSend);
 
                     getMapStringForChunk(sec-1,mapStringSend);
-                    sendMapToPlayer(getPlayer(s->game,fromId),2,mapStringSend);
+                    sendMapToPlayer(getPlayer(mainGame,fromId),2,mapStringSend);
 
                     getMapStringForChunk(sec-10001,mapStringSend);
-                    sendMapToPlayer(getPlayer(s->game,fromId),1,mapStringSend);*/
+                    sendMapToPlayer(getPlayer(mainGame,fromId),1,mapStringSend);*/
 
                 }
                 else if (strcmp(token,SEND_MAP_EDIT)==0) {
@@ -119,8 +126,8 @@ char* getReply(Server* s, int from, char* rcv) {
                 }
                 else if (publicChatSend==1) {
                     //publicChatSend=strtol(token,NULL,10);
-                    int sec = computeMapDataSection(*(getPlayer(s->game,fromId)->absX),*(getPlayer(s->game,fromId)->absY));
-                    actionToPlayersInMapSection(s->game,sec,sendPublicChatOfPlayerTo,getPlayer(s->game,fromId),token);
+                    int sec = computeMapDataSection(*(getPlayer(mainGame,fromId)->absX),*(getPlayer(mainGame,fromId)->absY));
+                    actionToPlayersInMapSection(mainGame,sec,sendPublicChatOfPlayerTo,getPlayer(mainGame,fromId),token);
                 }
                 break;
             case 4:
@@ -141,21 +148,21 @@ char* getReply(Server* s, int from, char* rcv) {
     //do actions after procesing the packet
     if (updatePosReq) {
         if (tileWalkable(getTileAt(x,y))) {
-            Player* p = getPlayer(s->game,fromId);
+            Player* p = getPlayer(mainGame,fromId);
             int oldX = *(p->absX);
             int oldY = *(p->absY);
             *(p->lastX) = oldX;
             *(p->lastY) = oldY;
             setPlayerCoords(p,x,y);
-            sendPlayerCoordinatesToClient(s->game,p);
+            sendPlayerCoordinatesToClient(mainGame,p);
             int sec = computeMapDataSection(x,y);
             int oldsec = computeMapDataSection(*(p->lastX),*(p->lastY));
             if (sec!=oldsec) {
                 //sendPlayerExitTo();
-                removePlayerFromMapSection(s->game,p,oldsec,0);
+                removePlayerFromMapSection(mainGame,p,oldsec,0);
             }
         }
-        //broadcastExistenceInMapSection(s->game,getPlayer(s->game,fromId),oldX,oldY);
+        //broadcastExistenceInMapSection(mainGame,getPlayer(mainGame,fromId),oldX,oldY);
         //broadcastPlayerPresence(p,oldX,oldY);
         //messageToAll(SHOW_PLAYER);
     }
@@ -164,16 +171,16 @@ char* getReply(Server* s, int from, char* rcv) {
             case LOGIN_SUCCESS:
                 printf("%s has successfully logged in.\n",name);
                 Player * p = newPlayer();
-                initPlayer(p,name,from,*(s->game->nextPlayerId));
+                initPlayer(p,name,from,*(mainGame->nextPlayerId));
                 registerPlayerWithID(p,s,from);
-                //addPlayer(s->game,name,from);
+                //addPlayer(mainGame,name,from);
                 //free(name);
                 //free(pass);
                 return "";
             case LOGIN_INVALID:
                 printf("invalid password for %s\n",name);
                 p = newPlayer();
-                initPlayer(p,name,from,*(s->game->nextPlayerId));
+                initPlayer(p,name,from,*(mainGame->nextPlayerId));
                 sendInvalidLoginNotification(p);
                 //free(name);
                 //free(pass);
@@ -181,10 +188,10 @@ char* getReply(Server* s, int from, char* rcv) {
             case LOGIN_NEW:
                 printf("%s does not have a profile. creating one...\n",name);
                 p = newPlayer();
-                initPlayer(p,name,from,*(s->game->nextPlayerId));
+                initPlayer(p,name,from,*(mainGame->nextPlayerId));
                 setPlayerToNew(p);
                 registerPlayerWithID(p,s,from);
-                //addPlayer(s->game,name,from);
+                //addPlayer(mainGame,name,from);
                 //free(name);
                 //free(pass);
                 return "";
@@ -224,7 +231,7 @@ if (strcmp(token,LOGIN_REQUEST)==0) {
 }
 else if (strcmp(token,REQUEST_FOR_PLAYER_DATA)==0) {
 printf("got info request. sending it...\n");
-sendPlayerDataToClient(getPlayer_fd(s->game,from));
+sendPlayerDataToClient(getPlayer_fd(mainGame,from));
 return "";
 }
 else if (strcmp(token,PLAYER_MOVEMENT_REQUEST)==0) {
@@ -256,7 +263,7 @@ if (logReq) {
 }
 else if (updatePosReq) {
     y = strtol(token,NULL,10);
-    setPlayerCoords(getPlayer_fd(s->game,from),x,y);
+    setPlayerCoords(getPlayer_fd(mainGame,from),x,y);
 
 }
 

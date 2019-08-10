@@ -36,8 +36,8 @@ Server * newServer() {
 
 void initServer(Server * me, int maxclients) {
     pthread_mutex_init(&serverLock,NULL);
-    me->game = newGame();
-    initGame(me->game);
+    mainGame = newGame();
+    initGame(mainGame);
     sendText = malloc(sizeof(char)*1024);
     broadcastText = malloc(sizeof(char)*1024);
     kick=-1;
@@ -47,7 +47,7 @@ void initServer(Server * me, int maxclients) {
 
 
 void deleteServer(Server * me) {
-    deleteGame(me->game);
+    deleteGame(mainGame);
 }
 
 
@@ -88,7 +88,7 @@ void * startServer(void * arg) {
     fd_set readfds; //set of socket descriptors
 
     pthread_t gameThread; //create game thread
-    int rc = pthread_create(&gameThread,NULL,&runGame,(void*)me->game);
+    int rc = pthread_create(&gameThread,NULL,&runGame,(void*)mainGame);
 
     int i;
     for (i=0; i< max_clients; i++) {
@@ -168,10 +168,10 @@ void * startServer(void * arg) {
                     getpeername(sd,(struct sockaddr*)&address, \
                                 (socklen_t*)&addrlen); //TODO: lookup peername and the slash operator
                     printf("Host disconnected , ip %s , port %d \n" , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));   //TODO: ntohs
-                    Player* ppp = getPlayer_fd(me->game,sd);
+                    Player* ppp = getPlayer_fd(mainGame,sd);
                     if (ppp!=NULL) {
                         printf("player was %s with id %d\n",ppp->playerName,*ppp->playerId);
-                        removePlayer(me->game,*ppp->playerId);
+                        removePlayer(mainGame,*ppp->playerId);
                     }
                     close(sd);
                     client_socket[i]=0;
@@ -198,10 +198,10 @@ void * startServer(void * arg) {
         }
         /*if (broadcastTextFlag==1) {
             printf("broadcasting; dontsend to %d\n",dontBroadcastTo);
-            for (int i=0; i<*(me->game->nextPlayerId); i++) {
+            for (int i=0; i<*(mainGame->nextPlayerId); i++) {
                 strcpy(sendbuffer,broadcastText);
                 printf("getting the fd \n");
-                Player* p = getPlayer(me->game,i);
+                Player* p = getPlayer(mainGame,i);
                 if (p==NULL)
                     continue;
                 int fd = *(p->playerFd);

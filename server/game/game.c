@@ -24,6 +24,12 @@ void initGame(Game* g) {
     *(g->nextPlayerId) = 0;
     g->playersByMapSection = newHashMap();
     initHashMap(g->playersByMapSection);
+
+    g->numNPCs = malloc(sizeof(int));
+    g->nextNPCId = malloc(sizeof(int));
+    *(g->numNPCs)=0;
+    *(g->nextNPCId)=0;
+    autospawnNPCs(g);
     //actionToPlayersInMapSection(g, printNumber);
 }
 void deleteGame(Game* g) {
@@ -179,7 +185,7 @@ void fetchPlayersInMapSection(Game* g, Player* p) {
     free(playersInSection);
 }
 
-void actionToPlayersInMapSection(Game* g, int sec, void (*action)(), Player* plrArg, char* txtArg) {
+void actionToPlayersInMapSection(Game* g, int sec, void (*action)(), Player* plrArg, void* arg) {
     //(*v)(5);
     MutableList* playersInSection = newMutableList();
     initMutableList(playersInSection);
@@ -187,11 +193,13 @@ void actionToPlayersInMapSection(Game* g, int sec, void (*action)(), Player* plr
     while (plid!=-1) {
         //printf("player in map section: %s\n",getPlayer(g,plid)->playerName);
         mutList_addValue(playersInSection,plid);
-
-        action(plrArg,getPlayer(g,plid),txtArg);
+        if (plrArg!=NULL)
+            action(plrArg,getPlayer(g,plid),arg);
+        else
+            action(getPlayer(g,plid),arg);
         //sendPlayerPresenceTo(getPlayer(g,plid),p,*(getPlayer(g,plid)->lastX),*(getPlayer(g,plid)->lastY));
         //sendPlayerPresenceTo(p,getPlayer(g,plid),*(p->lastX),*(p->lastY));
-        plid = hashMap_remove(g->playersByMapSection,sec);
+        plid = hashMap_remove(g->playersByMapSection,sec); //
     }
     while (!mutList_atEnd(playersInSection)) {
         hashMap_add_enableDuplicates(g->playersByMapSection,sec,mutList_next(playersInSection));
@@ -258,6 +266,65 @@ void saveMapdata(int section, char* data) {
     //sendPlayerDataToClient(p);
 }
 
+void autospawnNPCs(Game* g) {
+    char * filePath = "data/npc/spawn.txt";
+    if( access( filePath, F_OK ) != -1 ) { //file exists so read from it
+        FILE *fp;
+        char line[256];
+        if ((fp = fopen(filePath,"r"))!=NULL) {
+            int i=0;
+            int lineNum = 0;
+            while (fgets(line, sizeof(line), fp)) { //process lines
+                char *token;
+                token=strtok(line," ");
+                int t=0;
+                int x=-1;
+                int y=-1;
+                int z=-1;
+                int spawnID=-1;
+                while( token != NULL ) { //process tokens within line
+                    if (t==0) {
+                        spawnID = strtol(token,NULL,10);
+                    }
+                    else if (t==1) {
+                        x = strtol(token,NULL,10);
+                    }
+                    else if (t==2) {
+                        y = strtol(token,NULL,10);
+                    }
+                    else if (t==3) {
+                        z = strtol(token,NULL,10);
+                        spawnNPC(g,spawnID,x,y,z);
+                    }
+                    token = strtok(NULL, " ");
+                    t++;
+                }
+                lineNum++;
+                //printf("\n");
+                i++;
+            }
+        }
+        fclose(fp);
+    }
+    else {
+        printf("[NPC] Autospawn file not found.\n");
+    }
+}
+
+void spawnNPC(Game* g, int id, int x, int y, int z) {
+    printf("calling spawnNPC...\n");
+    int sid = *(g->nextNPCId);
+    if (sid>=MAX_NPCS) {
+        printf("[NPC] Max number of NPCs spawned.");
+        return;
+    }
+    g->npcs[sid] = newNPC();
+    initNPCFromFile(g->npcs[sid],id);
+    setNPCCoords(g->npcs[sid],x,y,z);
+    *(g->nextNPCId) = *(g->nextNPCId)+1;
+    *(g->npcs[sid]->serverID)=sid;
+}
+
 void * runGame(void * arg) {
     Game* g = (Game*)arg;
     while (1) { //game loop
@@ -271,6 +338,12 @@ void * runGame(void * arg) {
                 }
             }
         }
+        /*for (int i=0; i<*(g->nextNPCId); i++) { //process NPCs
+             if (g->npcs[i]!=NULL) {
+                 int sec = computeMapDataSection(npcX(g->npcs[i]),npcY(g->npcs[i]));
+                 actionToPlayersInMapSection(g,sec,alertPlayerOfNpc,NULL,g->npcs[i]);
+             }
+        }*/
         pthread_mutex_unlock(&gameLock);
     }
 }

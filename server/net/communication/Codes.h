@@ -24,6 +24,7 @@
 #define SEND_PLAYER_MAP "511"
 #define SEND_INFOBOX_MSG "513"
 #define PUBLIC_CHAT_FROM "515"
+#define SHOW_NPC "516"
 
 //actions - from client
 #define LOGIN_REQUEST "logmein"

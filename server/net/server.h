@@ -6,9 +6,10 @@
 #define BUFFER_SIZE 1025
 
 typedef struct {
-    Game * game;
+
 } Server;
 
+Game* mainGame;
 Server * newServer();
 void deleteServer(Server * me);
 void initServer(Server * me, int maxclients);
